@@ -17,7 +17,6 @@ const app = new Elysia().use(
 await app.modules
 console.log(app.routes)
 bench.add('route caching', async () => {
-    await app.modules
     const htmlPaths = [
         '/public/html',
         '/public/html/',
@@ -25,12 +24,10 @@ bench.add('route caching', async () => {
         '/public/html/index.html/'
     ]
     for (const path of htmlPaths) {
-        // console.log(path)
         const res = await app.handle(req(path))
-        // await (await res.blob()).text()
+        await (await res.blob()).text()
     }
 })
 
 await bench.run()
-// console.log(bench.name)
 console.table(bench.table())
