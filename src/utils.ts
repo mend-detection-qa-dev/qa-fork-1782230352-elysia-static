@@ -1,5 +1,6 @@
 import type { BunFile } from 'bun'
-import type { Stats } from 'fs'
+import { ElysiaFile, file as getElysiaFile } from 'elysia'
+import { ReadStream, Stats } from 'fs'
 
 let fs: typeof import('fs/promises')
 let path: typeof import('path')
@@ -21,23 +22,6 @@ export function getBuiltinModule() {
 
     return [fs, path] as const
 }
-
-export async function listHTMLFiles(dir: string) {
-    if (!fs) getBuiltinModule()
-
-    if (isBun) {
-        const glob = new Bun.Glob('**/*.html')
-        const files = []
-
-        for await (const file of glob.scan(dir))
-            files.push(path.join(dir, file))
-
-        return files
-    }
-
-    return []
-}
-
 export async function listFiles(dir: string): Promise<string[]> {
     if (!fs) getBuiltinModule()
 
@@ -68,13 +52,23 @@ export async function listFiles(dir: string): Promise<string[]> {
     return all.flat()
 }
 
+/**
+ * File exists and is not a directory
+ * @param path
+ * @returns
+ */
 export function fileExists(path: string) {
     if (!fs) getBuiltinModule()
 
     return fs.stat(path).then(
-        () => true,
+        (data) => !data.isDirectory(),
         () => false
     )
+}
+export function getFileStats(path: string) {
+    if (!fs) getBuiltinModule()
+
+    return fs.stat(path).catch(() => null)
 }
 
 export class LRUCache<K, V> {
@@ -134,11 +128,10 @@ export class LRUCache<K, V> {
         if (this.interval) clearInterval(this.interval)
     }
 }
-
-export function isCached(
+export function alreadyCachedDownstream(
     headers: Record<string, string | undefined>,
-    etag: string,
-    filePath: string
+    etag: string | undefined,
+    fileStats: Stats
 ) {
     // Always return stale when Cache-Control: no-cache
     // to support end-to-end reload requests
@@ -176,13 +169,10 @@ export function isCached(
         const ifModifiedSince = headers['if-modified-since']
 
         try {
-            return fs.stat(filePath).then((stat) => {
-                if (
-                    stat.mtime !== undefined &&
-                    stat.mtime.getTime() <= Date.parse(ifModifiedSince)
-                )
-                    return true
-            })
+            return (
+                fileStats.mtime !== undefined &&
+                fileStats.mtime.getTime() <= Date.parse(ifModifiedSince)
+            )
         } catch {}
     }
 
@@ -192,16 +182,13 @@ export function isCached(
 let Crypto: typeof import('crypto')
 
 export function getFile(path: string) {
-    if (isBun) return Bun.file(path)
-
-    if (!fs) getBuiltinModule()
-    return fs.readFile(path)
+    return getElysiaFile(path)
 }
 
-export async function generateETag(file: BunFile | Buffer<ArrayBufferLike>) {
+export async function generateETag(file: ElysiaFile) {
     if (isBun)
         return new Bun.CryptoHasher('md5')
-            .update(await (file as BunFile).arrayBuffer())
+            .update(await (file.value as BunFile).arrayBuffer())
             .digest('base64')
 
     if (!Crypto) Crypto = process.getBuiltinModule('crypto')
@@ -209,10 +196,9 @@ export async function generateETag(file: BunFile | Buffer<ArrayBufferLike>) {
         return void console.warn(
             '[@elysiajs/static] crypto is required to generate etag.'
         )
-
-    return Crypto.createHash('md5')
-        .update(file as Buffer)
-        .digest('base64')
+    if (!fs) getBuiltinModule()
+    const buffer = await fs.readFile(file.path) // redundant read, but the file.value ReadStream can only be read once...
+    return Crypto.createHash('md5').update(buffer).digest('base64')
 }
 
 export const isNotEmpty = (obj?: Object) => {
