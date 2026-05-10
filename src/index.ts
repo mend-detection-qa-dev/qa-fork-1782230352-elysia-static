@@ -11,12 +11,11 @@ import {
     alreadyCachedDownstream,
     getFile,
     isBun,
-    streamToString,
     getFileStats
 } from './utils'
 import type { StaticOptions } from './types'
 import { BunFile, HTMLBundle } from 'bun'
-import { ReadStream, Stats } from 'fs'
+import { Stats } from 'fs'
 
 interface CachedFile {
     data: Blob

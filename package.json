@@ -3,6 +3,15 @@
     "version": "1.4.10",
     "description": "Elysia plugin for serving static files",
     "license": "MIT",
+    "scripts": {
+        "dev": "bun run --watch example/index.ts",
+        "dev:node": "tsx watch example/index.ts",
+        "bench": "bun run bench/index.ts",
+        "test": "bun run build && bun test && vitest run && npm run test:node",
+        "test:node": "npm install --prefix ./test/node/cjs/ && npm install --prefix ./test/node/esm/ && node ./test/node/cjs/index.js && node ./test/node/esm/index.js",
+        "build": "bun build.ts",
+        "release": "npm run build && npm run test && npm publish --access public"
+    },
     "keywords": [
         "elysia",
         "static",
@@ -17,7 +26,10 @@
         "type": "git",
         "url": "https://github.com/elysiajs/elysia-static"
     },
+    "bugs": "https://github.com/elysiajs/elysia-static/issues",
+    "homepage": "https://github.com/elysiajs/elysia-static",
     "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
     "module": "./dist/index.js",
     "devDependencies": {
         "@elysiajs/node": "^1.4.5",
@@ -34,9 +46,6 @@
         "tsx": "^4.21.0",
         "typescript": "^5.9.3",
         "vitest": "^4.1.5"
-    },
-    "peerDependencies": {
-        "elysia": ">= 1.4.0"
     },
     "exports": {
         "./package.json": "./package.json",
@@ -56,16 +65,7 @@
             "require": "./dist/types.js"
         }
     },
-    "bugs": "https://github.com/elysiajs/elysia-static/issues",
-    "homepage": "https://github.com/elysiajs/elysia-static",
-    "scripts": {
-        "dev": "bun run --watch example/index.ts",
-        "dev:node": "tsx watch example/index.ts",
-        "bench": "bun run bench/index.ts",
-        "test": "bun run build && bun test && vitest run && npm run test:node",
-        "test:node": "npm install --prefix ./test/node/cjs/ && npm install --prefix ./test/node/esm/ && node ./test/node/cjs/index.js && node ./test/node/esm/index.js",
-        "build": "bun build.ts",
-        "release": "npm run build && npm run test && npm publish --access public"
-    },
-    "types": "./dist/index.d.ts"
+    "peerDependencies": {
+        "elysia": ">= 1.4.0"
+    }
 }
