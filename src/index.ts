@@ -86,6 +86,7 @@ export async function staticPlugin<const Prefix extends string = '/prefix'>({
         seed: prefix
     })
     app.onError(() => {})
+
     const files = (await listFiles(assetsDir)).sort((path1, path2) => {
         const isHTML1 = path1.endsWith('.html')
         const isHTML2 = path2.endsWith('.html')
@@ -122,9 +123,7 @@ export async function staticPlugin<const Prefix extends string = '/prefix'>({
         const urlPath = getURLPath(absoluteFilePath)
         const prebundledHTML = shouldBundleFileWithBun
             ? ((await import(absoluteFilePath)).default as HTMLBundle)
-            : !useETag
-              ? getFile(absoluteFilePath)
-              : undefined
+            : undefined
 
         mountRoute({ urlPath, absoluteFilePath, prebundledHTML })
         staticRoutesMounted++
@@ -176,7 +175,7 @@ export async function staticPlugin<const Prefix extends string = '/prefix'>({
         urlPath: string
         absoluteFilePath: string | ((params: any) => string)
         /** if provided, will serve bun HTML file instead of custom handler */
-        prebundledHTML?: HTMLBundle | ElysiaFile
+        prebundledHTML?: HTMLBundle
     }) {
         app.get(
             urlPath,
@@ -247,7 +246,6 @@ export async function staticPlugin<const Prefix extends string = '/prefix'>({
             set.headers['cache-control'] = maxAge
                 ? `${directive}, max-age=${maxAge}`
                 : directive
-
             return file.data
         }
 
@@ -279,6 +277,7 @@ export async function staticPlugin<const Prefix extends string = '/prefix'>({
         if (fileStat === null || fileStat.isDirectory()) {
             throw new NotFoundError()
         }
+
         try {
             if (absoluteFilePath.endsWith('.html') && isBun && bunFullstack) {
                 throw new Error(
@@ -286,17 +285,14 @@ export async function staticPlugin<const Prefix extends string = '/prefix'>({
                 )
             } else {
                 const file = getFile(absoluteFilePath)
-                const cachedFileBlob: Blob = isBun
-                    ? new Blob([await (file.value as BunFile).text()], {
-                          // BunFiles are lazy by default, so we'll read out the content now instead of later (lest we get a 404 down the line)
-                          type: file.type
+                const cachedFileResponse = isBun
+                    ? (file.value as BunFile) // bun does its own magic with these lazy blobs, so we don't need to eagerly load them here
+                    : new Blob([await fs.readFile(absoluteFilePath)], {
+                          type: file.type // save the content-type here
                       })
-                    : new Blob(
-                          [await streamToString(file.value as ReadStream)],
-                          { type: file.type }
-                      )
+
                 const cachedFile: CachedFile = {
-                    data: cachedFileBlob,
+                    data: cachedFileResponse,
                     stats: fileStat,
                     etag: await generateETag(file)
                 }

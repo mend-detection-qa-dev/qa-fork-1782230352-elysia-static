@@ -866,6 +866,26 @@ describe('Static Plugin', () => {
             expect((await res.bytes()).length).toBe(2)
         }
     )
+    it.each([{ alwaysStatic: true }, { alwaysStatic: false }])(
+        'range request header on video',
+        async ({ alwaysStatic }) => {
+            const app = new Elysia().use(
+                staticPlugin({
+                    assets: 'public',
+                    prefix: '',
+                    indexHTML: true,
+                    alwaysStatic
+                })
+            )
+
+            await app.modules
+            const request = req('/kyuukurarin.mp4')
+            request.headers.set('range', 'bytes=37158912-')
+            const res = await app.handle(request)
+            expect(res.status).toBe(206) // partial request
+            expect((await res.bytes()).length).toBe(3220118)
+        }
+    )
     it("doesn't allow path traversal attacks", async () => {
         const app = new Elysia().use(
             staticPlugin({
@@ -879,5 +899,24 @@ describe('Static Plugin', () => {
         const request = req('/..%2Fsrc/index.ts')
         const res = await app.handle(request)
         expect(res.status).toBe(404)
+    })
+    it('allows custom headers when etag is false and alwaysStatic is true', async () => {
+        const app = new Elysia().use(
+            staticPlugin({
+                assets: 'public',
+                prefix: '',
+                etag: false,
+                headers: {
+                    custom: 'hi'
+                },
+                alwaysStatic: true
+            })
+        )
+
+        await app.modules
+        const request = req('/kyuukurarin.mp4')
+        const res = await app.handle(request)
+        expect(res.status).toBe(200)
+        expect(res.headers.get('custom')).toBe('hi')
     })
 })
